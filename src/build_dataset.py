@@ -12,6 +12,7 @@ Encoding convention: every signed feature is from the Democratic point of view
 """
 
 import argparse
+import io
 import re
 from pathlib import Path
 
@@ -32,15 +33,39 @@ REDISTRICT_YEARS = {1982, 1992, 2002, 2012, 2022}
 
 NAME_SUFFIXES = {"JR", "SR", "II", "III", "IV"}
 
+PSEUDO_CANDIDATE = r"BLANK|UNDER ?VOTE|OVER ?VOTE|EXHAUSTED|SCATTERING|^VOID"
+
 
 # ---------------------------------------------------------------- loading
+def repair_wrapped_lines(header: str, data: list[str]) -> list[str]:
+    """
+    Dataverse's regenerated .tab export wraps every data line in one pair of quotes
+    and backslash-escapes the quotes and backslashes inside, e.g.
+        "1976,ALABAMA,...,\\"WILLIAM L ...\\",REPUBLICAN,..."
+    Undo that so each line is a normal CSV row again.
+    """
+    wrapped = sum(l.startswith('"') and l.endswith('"') for l in data)
+    if header.startswith('"') or wrapped < 0.9 * len(data):
+        return data                                            # file looks normal; leave it alone
+    print(f"Repairing quote-wrapped export ({wrapped:,} of {len(data):,} lines)")
+    return [re.sub(r"\\(.)", r"\1", l[1:-1]) if l.startswith('"') and l.endswith('"') else l
+            for l in data]
+
+
 def load_raw(path: Path) -> pd.DataFrame:
-    sep = "\t" if path.suffix.lower() in {".tab", ".tsv"} else ","
     try:
-        df = pd.read_csv(path, sep=sep, low_memory=False)
+        text = path.read_text(encoding="utf-8")
     except UnicodeDecodeError:
-        df = pd.read_csv(path, sep=sep, low_memory=False, encoding="latin-1")
-    df.columns = [c.strip().lower() for c in df.columns]
+        text = path.read_text(encoding="latin-1")
+    lines = [l for l in text.splitlines() if l.strip()]
+    header, data = lines[0], repair_wrapped_lines(lines[0], lines[1:])
+
+    # Detect the delimiter from the header; file extensions on Dataverse aren't reliable.
+    sep = "\t" if header.count("\t") > header.count(",") else ","
+    print(f"Reading {path.name} with delimiter {'TAB' if sep == chr(9) else 'COMMA'}")
+    df = pd.read_csv(io.StringIO("\n".join([header] + data)), sep=sep, low_memory=False)
+    df.columns = [c.strip().strip('"').lower() for c in df.columns]
+    print(f"Loaded {len(df):,} rows x {df.shape[1]} columns")
     required = {"year", "state_po", "district", "candidate", "party", "candidatevotes"}
     missing = required - set(df.columns)
     if missing:
@@ -53,12 +78,32 @@ def as_bool(s: pd.Series) -> pd.Series:
 
 
 def filter_general_elections(df: pd.DataFrame) -> pd.DataFrame:
-    if "stage" in df.columns:
-        df = df[df["stage"].astype(str).str.upper() == "GEN"]
-    if "special" in df.columns:
-        df = df[~as_bool(df["special"])]
-    if "runoff" in df.columns:
-        df = df[~as_bool(df["runoff"])]
+    """
+    Keep, for each state-district-year, the rows of the election that decided the seat.
+    Priority (highest wins):
+        3  runoff                      (e.g. Texas 1996 December runoffs, Louisiana 2002)
+        2  regular general election
+        1  special general election    (e.g. Texas 2006 court-ordered redraws)
+        0  special "primary"-stage     (Texas 1996 November open elections under a new map)
+    Same-day special elections to fill a vacancy are dropped whenever a regular general exists.
+    """
+    df = df[df["state_po"] != "DC"]            # non-voting delegate, only present in some years
+    # Ballot-counting artifacts recorded as "candidates" (blank/under/over votes, exhausted RCV ballots).
+    pseudo = df["candidate"].astype(str).str.upper().str.contains(PSEUDO_CANDIDATE, regex=True)
+    df = df[~pseudo]
+    stage = df["stage"].astype(str).str.upper() if "stage" in df.columns else pd.Series("GEN", index=df.index)
+    special = as_bool(df["special"]) if "special" in df.columns else pd.Series(False, index=df.index)
+    runoff = as_bool(df["runoff"]) if "runoff" in df.columns else pd.Series(False, index=df.index)
+
+    priority = np.select(
+        [runoff, (stage == "GEN") & ~special, (stage == "GEN") & special, (stage == "PRI") & special],
+        [3, 2, 1, 0], default=-1)
+    df = df.assign(_priority=priority)
+    df = df[df["_priority"] >= 0]              # regular (non-special) primaries are never used
+    best = df.groupby(["year", "state_po", "district"])["_priority"].transform("max")
+    df = df[df["_priority"] == best]
+    df = df.assign(decided_by=df["_priority"].map({3: "runoff", 2: "general", 1: "special", 0: "special"}))
+    df = df.drop(columns="_priority")
     # If a race reports both TOTAL and per-mode rows, keep only TOTAL to avoid double counting.
     if "mode" in df.columns:
         is_total = df["mode"].astype(str).str.upper() == "TOTAL"
@@ -72,7 +117,7 @@ def major_party(p) -> str:
     p = str(p).upper().strip()
     if p.startswith("DEMOCRAT"):          # DEMOCRAT, DEMOCRATIC-FARMER-LABOR, ...
         return "D"
-    if p.startswith("REPUBLICAN"):
+    if p.startswith("REPUBLICAN") or p == "INDEPENDENT-REPUBLICAN":   # MN GOP's name until 1995
         return "R"
     return "O"
 
@@ -119,6 +164,7 @@ def build_race_table(df: pd.DataFrame) -> pd.DataFrame:
         .merge(top_of("D"), on=race, how="left")
         .merge(top_of("R"), on=race, how="left")
         .merge(winners, on=race, how="left")
+        .merge(df.groupby(race, as_index=False)["decided_by"].first(), on=race, how="left")
     )
     races[["d_votes", "r_votes"]] = races[["d_votes", "r_votes"]].fillna(0)
 
