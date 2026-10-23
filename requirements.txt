@@ -1,0 +1,5 @@
+numpy
+pandas
+matplotlib
+scikit-learn   # sanity checks only; core models are implemented in NumPy
+jupyter
