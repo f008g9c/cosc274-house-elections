@@ -225,3 +225,7 @@ data/processed/*
 !data/processed/.gitkeep
 .venv/
 .ipynb_checkpoints/
+
+.DS_Store
+
+
