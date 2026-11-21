@@ -10,17 +10,20 @@ data/
   processed/    # generated modeling table (not committed)
 src/
   build_dataset.py   # raw returns -> one row per district-year with features
-notebooks/      # exploration and figures
-results/        # saved metrics and plots
+notebooks/
+  01_explore.ipynb   # exploratory data analysis
+  02_models.ipynb    # main workflow: models, evaluation, results (submission notebook)
+results/        # saved metrics and figures
 ```
 
 ## Setup
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+conda env create -f env.yml
+conda activate house-elections
 ```
+
+In VS Code, select the `house-elections` environment as the notebook kernel. (`requirements.txt` lists the same packages for anyone using pip.)
 
 ## Data
 
@@ -48,10 +51,10 @@ Does using older elections as a prior produce better-calibrated forecasts than p
 
 | Task | Models |
 |---|---|
-| Classification (who wins) | Logistic regression (cross-entropy), random forest, Bayesian classifier with a historical prior |
+| Classification (who wins) | Logistic regression (cross-entropy), random forest, Naive Bayes with a historical prior, Bayesian logistic regression with a historical prior |
 | Regression (vote margin)  | Least squares, least absolute deviations (LAD), Bayesian linear regression with a historical prior |
 
-For both Bayesian models, elections from 1978–1998 set the prior and 2000–2014 update it. All models see the same 1978–2014 training elections.
+For every Bayesian model, elections from 1978–1998 set the prior (as pseudo-counts or a prior distribution, scaled by a weight a₀) and 2000–2014 update it. All models see the same 1978–2014 training elections.
 
 ## Evaluation
 
