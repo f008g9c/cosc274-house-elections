@@ -1,0 +1,15 @@
+year,selected model (A),compared with (B),log loss A − B,95% CI low,95% CI high,verdict
+2018,"Naive Bayes, recent only (a₀ = 0)","Naive Bayes, pooled (a₀ = 1)",0.008301274993639864,0.0027263834104871904,0.014790502924841423,A worse
+2018,"Naive Bayes, recent only (a₀ = 0)",logistic regression,0.2947356852089911,0.19315713142331406,0.40444433424714943,A worse
+2018,"Naive Bayes, recent only (a₀ = 0)",random forest,0.3294372612697637,0.2177726641124845,0.4508884579459059,A worse
+2018,"Bayesian logistic, historical prior (a₀ = 0.1)","Bayesian logistic, pooled (a₀ = 1)",-0.006395425521518703,-0.01250068227373041,-5.326039755230596e-05,A better
+2018,"Bayesian logistic, historical prior (a₀ = 0.1)","Bayesian logistic, recent only (a₀ = 0)",0.002629392705955198,-0.0008537979446848557,0.0060177567482765934,no clear difference
+2018,"Bayesian logistic, historical prior (a₀ = 0.1)",logistic regression,-0.00709246045183718,-0.013010686290519751,-0.0007234847350534775,A better
+2018,"Bayesian logistic, historical prior (a₀ = 0.1)",random forest,0.027609115608935357,0.00985664352389446,0.04718986013052918,A worse
+2022,"Naive Bayes, recent only (a₀ = 0)","Naive Bayes, pooled (a₀ = 1)",0.011292096017839173,0.0053990194506564415,0.017764880729362945,A worse
+2022,"Naive Bayes, recent only (a₀ = 0)",logistic regression,0.057167072489636546,-0.018496283431310698,0.14693429259214877,no clear difference
+2022,"Naive Bayes, recent only (a₀ = 0)",random forest,0.08689682698303985,0.010623013474887366,0.1678467964455327,A worse
+2022,"Bayesian logistic, historical prior (a₀ = 0.1)","Bayesian logistic, pooled (a₀ = 1)",0.10099052735290356,0.0779208781806158,0.12595214901699847,A worse
+2022,"Bayesian logistic, historical prior (a₀ = 0.1)","Bayesian logistic, recent only (a₀ = 0)",-0.06520061831762994,-0.0765659411026211,-0.053930360043402646,A better
+2022,"Bayesian logistic, historical prior (a₀ = 0.1)",logistic regression,0.10206701826488038,0.07791203806956383,0.12666116180533596,A worse
+2022,"Bayesian logistic, historical prior (a₀ = 0.1)",random forest,0.13179677275828366,0.09247663053352609,0.17474809583178053,A worse
